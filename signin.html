@@ -153,6 +153,7 @@
         <div class="divider"></div>
         <a href="index.html" class="back-link"><i class="fas fa-home"></i> Go to Home</a>
         <a href="pro-apks.html" class="back-link" style="margin-left:16px;"><i class="fas fa-crown"></i> Pro APKs</a>
+        <a href="admin.html" class="back-link" style="margin-left:16px;" id="adminLink"><i class="fas fa-user-shield"></i> Admin</a>
       </div>
     </div>
   </div>
@@ -166,14 +167,40 @@
   const userAvatar = document.getElementById('userAvatar');
   const userName = document.getElementById('userName');
   const userEmail = document.getElementById('userEmail');
+  const adminLink = document.getElementById('adminLink');
 
-  auth.onAuthStateChanged((user) => {
+  // Check if user is admin
+  async function checkAdminStatus(user) {
+    if (!user) return false;
+    try {
+      const doc = await db.collection('settings').doc('admin').get();
+      let adminEmails = [];
+      if (doc.exists) {
+        const data = doc.data();
+        if (data.emails && Array.isArray(data.emails)) {
+          adminEmails = data.emails;
+        } else if (data.email) {
+          adminEmails = [data.email];
+        }
+      }
+      return adminEmails.includes(user.email);
+    } catch (error) {
+      console.error('Error checking admin status:', error);
+      return false;
+    }
+  }
+
+  auth.onAuthStateChanged(async (user) => {
     if (user) {
       notSignedIn.style.display = 'none';
       signedIn.style.display = 'block';
       userAvatar.src = user.photoURL || 'https://ui-avatars.com/api/?name=' + user.displayName + '&background=FFD700&color=000';
       userName.textContent = user.displayName || 'User';
       userEmail.textContent = user.email;
+      
+      // Show/hide admin link based on admin status
+      const isAdmin = await checkAdminStatus(user);
+      adminLink.style.display = isAdmin ? 'inline-block' : 'none';
     } else {
       notSignedIn.style.display = 'block';
       signedIn.style.display = 'none';
@@ -183,16 +210,18 @@
   // ===== GOOGLE SIGN IN =====
   document.getElementById('googleSignInBtn').addEventListener('click', function() {
     const provider = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithPopup(provider).then((result) => {
-      // Check if redirect parameter exists
-      const urlParams = new URLSearchParams(window.location.search);
-      const redirect = urlParams.get('redirect');
-      if (redirect) {
-        window.location.href = redirect;
-      }
-    }).catch((error) => {
-      alert('Sign in failed: ' + error.message);
-    });
+    auth.signInWithPopup(provider)
+      .then((result) => {
+        // Check if redirect parameter exists
+        const urlParams = new URLSearchParams(window.location.search);
+        const redirect = urlParams.get('redirect');
+        if (redirect) {
+          window.location.href = redirect;
+        }
+      })
+      .catch((error) => {
+        alert('Sign in failed: ' + error.message);
+      });
   });
 
   // ===== SIGN OUT =====
