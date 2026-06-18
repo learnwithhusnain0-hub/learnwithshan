@@ -134,6 +134,20 @@
     .upload-section.active { display: block; }
     .login-section { display: block; }
     .login-section.hidden { display: none; }
+    .access-denied {
+      text-align: center;
+      padding: 40px 20px;
+      color: #ff4444;
+    }
+    .access-denied i { font-size: 3rem; margin-bottom: 16px; display: block; }
+    .access-denied h2 { color: #fff; margin-bottom: 8px; }
+    .access-denied p { color: #888; }
+    .access-denied .back-link {
+      display: inline-block;
+      margin-top: 16px;
+      color: #FFD700;
+      text-decoration: underline;
+    }
   </style>
 </head>
 <body>
@@ -169,6 +183,16 @@
   <div class="admin-box">
     <h1><i class="fas fa-user-shield"></i> Admin Panel</h1>
     
+    <!-- Access Denied (shown when not admin) -->
+    <div id="accessDenied" style="display:none;">
+      <div class="access-denied">
+        <i class="fas fa-lock"></i>
+        <h2>Access Denied</h2>
+        <p>You do not have permission to access the admin panel.</p>
+        <a href="index.html" class="back-link"><i class="fas fa-arrow-left"></i> Back to Home</a>
+      </div>
+    </div>
+
     <!-- Login Section -->
     <div class="login-section" id="loginSection">
       <button class="google-btn" id="googleLoginBtn">
@@ -226,7 +250,6 @@
 </a>
 
 <script src="js/firebase-config.js"></script>
-<script src="js/auth.js"></script>
 <script>
   // ===== MENU =====
   const menuToggle = document.getElementById('menuToggle');
@@ -245,6 +268,7 @@
   // ===== ADMIN LOGIC =====
   const loginSection = document.getElementById('loginSection');
   const uploadSection = document.getElementById('uploadSection');
+  const accessDenied = document.getElementById('accessDenied');
   const googleLoginBtn = document.getElementById('googleLoginBtn');
   const adminLogoutBtn = document.getElementById('adminLogoutBtn');
 
@@ -274,45 +298,58 @@
     return adminEmails.includes(user.email);
   }
 
-  function updateUI(isAdmin) {
-    if (isAdmin) {
-      loginSection.classList.add('hidden');
-      uploadSection.classList.add('active');
-      loadAdminAPKs();
-    } else {
+  function updateUI(isAdmin, isLoggedIn) {
+    // Hide all first
+    loginSection.classList.add('hidden');
+    uploadSection.classList.remove('active');
+    accessDenied.style.display = 'none';
+    
+    if (!isLoggedIn) {
+      // Not logged in - show login
       loginSection.classList.remove('hidden');
-      uploadSection.classList.remove('active');
+    } else if (isLoggedIn && isAdmin) {
+      // Logged in and admin - show upload
+      uploadSection.classList.add('active');
+    } else if (isLoggedIn && !isAdmin) {
+      // Logged in but not admin - show access denied
+      accessDenied.style.display = 'block';
     }
   }
 
   auth.onAuthStateChanged(async (user) => {
     if (user) {
       const isAdmin = await isUserAdmin(user);
-      updateUI(isAdmin);
+      updateUI(isAdmin, true);
+      if (isAdmin) {
+        loadAdminAPKs();
+      }
     } else {
-      updateUI(false);
+      updateUI(false, false);
     }
   });
 
   googleLoginBtn.addEventListener('click', function() {
     const provider = new firebase.auth.GoogleAuthProvider();
-    auth.signInWithPopup(provider).then(async (result) => {
-      const isAdmin = await isUserAdmin(result.user);
-      if (isAdmin) {
-        updateUI(true);
-      } else {
-        alert('You are not authorized as admin.');
-        auth.signOut();
-        updateUI(false);
-      }
-    }).catch((error) => {
-      alert('Login failed: ' + error.message);
-    });
+    auth.signInWithPopup(provider)
+      .then(async (result) => {
+        const isAdmin = await isUserAdmin(result.user);
+        if (isAdmin) {
+          updateUI(true, true);
+          loadAdminAPKs();
+        } else {
+          alert('You are not authorized as admin.');
+          auth.signOut();
+          updateUI(false, false);
+        }
+      })
+      .catch((error) => {
+        alert('Login failed: ' + error.message);
+      });
   });
 
   adminLogoutBtn.addEventListener('click', function() {
     auth.signOut();
-    updateUI(false);
+    updateUI(false, false);
   });
 
   // ===== Upload APK =====
