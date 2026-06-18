@@ -9,6 +9,11 @@
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Montserrat:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
   <link rel="stylesheet" href="css/style.css">
+  <style>
+    /* Additional styles for admin visibility */
+    .admin-menu-item { display: none; }
+    .admin-menu-item.visible { display: flex; }
+  </style>
 </head>
 <body>
 
@@ -74,12 +79,13 @@
   <a href="#aitools"><i class="fas fa-robot"></i> AI Tools</a>
   <a href="#editing"><i class="fas fa-video"></i> Video Editing</a>
   <a href="pro-apks.html"><i class="fas fa-crown"></i> Pro APKs</a>
-  <a href="admin.html"><i class="fas fa-user-shield"></i> Admin</a>
+  <a href="admin.html" class="admin-menu-item" id="adminMenuItem"><i class="fas fa-user-shield"></i> Admin</a>
   <a href="#transaction"><i class="fas fa-credit-card"></i> Transaction</a>
   <a href="#social"><i class="fas fa-share-alt"></i> Social</a>
   <a href="#" class="menu-highlight"><i class="fas fa-phone"></i> 0317 3724356</a>
 </nav>
 
+<!-- REST OF THE CONTENT (same as before) -->
 <!-- HERO -->
 <section class="hero" id="hero">
   <div class="hero-content">
@@ -307,7 +313,6 @@
 </a>
 
 <script src="js/firebase-config.js"></script>
-<script src="js/auth.js"></script>
 <script>
   // ===== LOADING SCREEN =====
   setTimeout(function() {
@@ -377,6 +382,46 @@
     });
   }, { threshold: 0.15, rootMargin: '0px 0px -30px 0px' });
   revealElements.forEach(el => revealObserver.observe(el));
+
+  // ===== CHECK ADMIN ACCESS AND SHOW/HIDE ADMIN MENU =====
+  async function checkAdminAndShowMenu() {
+    const adminMenuItem = document.getElementById('adminMenuItem');
+    const user = auth.currentUser;
+    
+    if (!user) {
+      adminMenuItem.classList.remove('visible');
+      return;
+    }
+    
+    try {
+      // Get admin emails from Firestore
+      const doc = await db.collection('settings').doc('admin').get();
+      let adminEmails = [];
+      if (doc.exists) {
+        const data = doc.data();
+        if (data.emails && Array.isArray(data.emails)) {
+          adminEmails = data.emails;
+        } else if (data.email) {
+          adminEmails = [data.email];
+        }
+      }
+      
+      // Check if current user is admin
+      if (adminEmails.includes(user.email)) {
+        adminMenuItem.classList.add('visible');
+      } else {
+        adminMenuItem.classList.remove('visible');
+      }
+    } catch (error) {
+      console.error('Error checking admin status:', error);
+      adminMenuItem.classList.remove('visible');
+    }
+  }
+
+  // ===== AUTH STATE OBSERVER =====
+  auth.onAuthStateChanged((user) => {
+    checkAdminAndShowMenu();
+  });
 
   // ===== TRANSACTION =====
   const submitBtn = document.getElementById('submitTransBtn');
